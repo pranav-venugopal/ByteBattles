@@ -1,12 +1,13 @@
 import secrets
 from sqlalchemy import text
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, status, HTTPException, Request
 from fastapi.security.oauth2 import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from ..schemas.user import UserCreate, UserResponse, RefreshAccessTokenRequest, TokenPayload
 
 from ..utils import password_manager, oauth2
+from ..utils.redis_utils import check_rate_limit
 from ..database import get_db
 
 from shared.models import User, UserType
@@ -43,7 +44,17 @@ def register(new_user: UserCreate, db: Session = Depends(get_db)):
     return new_user
 
 @router.post('/login', status_code=status.HTTP_200_OK)
-def login(cred: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(request: Request, cred: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+
+    # ── Feature: Login Rate Limiting (5 attempts / 60 s per IP) ──
+    client_ip = request.client.host if request.client else "unknown"
+    allowed, remaining, retry_after = check_rate_limit("login", client_ip, 5, 60)
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
 
     user = db.query(User).filter(User.username == cred.username).first()
     if not user:

@@ -41,9 +41,18 @@ def create_submission(details: SubmissionCreate, response: Response, current_use
     if not problem:
         raise HTTPException(detail="Problem with the given ID was not found", status_code=status.HTTP_404_NOT_FOUND)
 
+    # ── Feature: Submission Size Cap (64 KiB) ──
+    MAX_CODE_SIZE_BYTES = 64 * 1024
+    code_bytes = details.code.encode("utf-8")
+    if len(code_bytes) > MAX_CODE_SIZE_BYTES:
+        raise HTTPException(
+            detail="Source code exceeds the 64 KiB size limit",
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        )
+
     code_object_key = get_storage_submission_code().upload_bytes(
         extension=EXTENSIONS[details.language],
-        data=details.code.encode("utf-8")
+        data=code_bytes
     )
 
     submission = Submission(

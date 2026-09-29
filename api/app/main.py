@@ -6,7 +6,7 @@ from shared import models
 from .database import get_db
 from .utils.redis_utils import get_redis_client
 from .utils.telemetry import get_system_telemetry
-from .routes import auth, users, problems, submissions
+from .routes import auth, users, problems, submissions, leaderboard
 
 Base.metadata.create_all(bind=engine)
 
@@ -22,6 +22,7 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(problems.router)
 app.include_router(submissions.router)
+app.include_router(leaderboard.router)
 
 @app.get("/health", tags=["Telemetry"])
 def health(db=Depends(get_db)):
