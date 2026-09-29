@@ -1,5 +1,4 @@
-# Mission Control Status: Stellar
-"""Deep-space telemetry for the ByteBattles constellation."""
+"""System telemetry and health diagnostics for the ByteBattles backend."""
 import time
 
 from redis import Redis
@@ -8,15 +7,11 @@ from sqlalchemy import text
 from config import REDIS_JOB_LIST, WORKER_PREFIX, WARM_QUEUE_PREFIX
 
 
-def cosmo_polo_telemetry(redis_client: Redis, db_session=None) -> dict:
-    """Ping every station in the constellation and report back to Mission Control.
-
-    Checks the Redis relay satellite, the Postgres star-catalog, the judge
-    queue's cargo manifest, and how many judge-worker probes are transmitting.
-    """
+def get_system_telemetry(redis_client: Redis, db_session=None) -> dict:
+    """Collects system health metrics, database connection status, and worker queue depths."""
     report = {}
 
-    # Sweep the Redis relay satellite
+    # Redis connectivity and ping latency
     try:
         t0 = time.perf_counter()
         redis_ok = bool(redis_client.ping())
@@ -25,7 +20,7 @@ def cosmo_polo_telemetry(redis_client: Redis, db_session=None) -> dict:
         redis_ok = False
         report["redis_latency_ms"] = None
 
-    # Query the Postgres star-catalog
+    # Postgres database health check
     db_ok = None
     if db_session is not None:
         try:
@@ -34,7 +29,7 @@ def cosmo_polo_telemetry(redis_client: Redis, db_session=None) -> dict:
         except Exception:
             db_ok = False
 
-    # Read the judge queue's cargo manifest and count live worker probes
+    # Queue depth, worker heartbeats, and warm sandbox pool counts
     queue_depth = active_workers = None
     if redis_ok:
         try:
@@ -45,6 +40,7 @@ def cosmo_polo_telemetry(redis_client: Redis, db_session=None) -> dict:
                 beat = redis_client.get(key)
                 if beat and now - float(beat) < 10:
                     active_workers += 1
+
             # Warm sandbox pool depth per language
             warm_pool = {}
             for lang in ("C", "CPP", "PY", "JS"):
@@ -53,9 +49,9 @@ def cosmo_polo_telemetry(redis_client: Redis, db_session=None) -> dict:
         except Exception:
             pass
 
-    nominal = redis_ok and db_ok is not False
+    is_healthy = redis_ok and db_ok is not False
     report.update({
-        "status": "Mission Control Status: Stellar" if nominal else "Mission Control Status: Anomaly",
+        "status": "healthy" if is_healthy else "unhealthy",
         "redis": "up" if redis_ok else "down",
         "postgres": {None: "unchecked", True: "up", False: "down"}[db_ok],
         "judge_queue_depth": queue_depth,
