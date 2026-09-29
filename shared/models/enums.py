@@ -1,5 +1,3 @@
-# Mission Control Status: Stellar
-# Orbital Telemetry & Classification Enums
 from enum import Enum
 
 class UserType(str, Enum):
@@ -25,4 +23,4 @@ class Language(str, Enum):
     C = "C"
     CPP = "CPP"
     PYTHON = "PY"
-    JAVASCRIPT = "JAVASCRIPT"  # Orbital Node probe runtime
+    JAVASCRIPT = "JAVASCRIPT"

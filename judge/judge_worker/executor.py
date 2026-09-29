@@ -1,11 +1,10 @@
 import io
+import socket
 import tarfile
 import docker
 from docker.utils.socket import frames_iter
 
-from config import (
-    WORKSPACE_DIR,
-)
+from config import WORKSPACE_DIR
 from shared.models import Language, FILENAME, Verdict
 from .types import CompileResult, RunResult
 
@@ -64,15 +63,11 @@ class JudgeExecutor:
         memory_limit_kb: int,
     ) -> RunResult:
         
-        # Build command
-        if language == Language.C:
-            inner_cmd = f"{executable_path}"
-        elif language == Language.CPP:
+        if language == Language.C or language == Language.CPP:
             inner_cmd = f"{executable_path}"
         elif language == Language.PYTHON:
             inner_cmd = f"python3 {executable_path}"
         elif language == Language.JAVASCRIPT:
-            # Mission Control Status: Stellar - Node probe thrusters
             inner_cmd = f"node {executable_path}"
         else:
             raise ValueError(f"Unsupported language: {language}")
@@ -80,13 +75,12 @@ class JudgeExecutor:
         cmd = [
             "/bin/sh",
             "-lc",
-            f"/usr/bin/time -f \'%e %M\' timeout -s KILL {time_limit_sec}s sh -c \"{inner_cmd} 2>/dev/null\""
+            f"/usr/bin/time -f '%e %M' timeout -s KILL {time_limit_sec}s sh -c \"{inner_cmd} 2>/dev/null\""
         ]
 
         exec_id = self.client.api.exec_create(
             container.id,
             cmd=cmd,
-            # stdin=False,
             stdin=True,
             tty=False,
             user='run'
@@ -98,10 +92,8 @@ class JudgeExecutor:
             tty=False,
         )
 
-        # send stdin and signal EOF
         sock._sock.sendall(input_data.encode())
         try:
-            import socket
             sock._sock.shutdown(socket.SHUT_WR)
         except Exception:
             pass
@@ -125,17 +117,16 @@ class JudgeExecutor:
 
         stats = stderr_output.split("\n")[-2].split()
 
-        time_elapsed = min(int(float(stats[0])), time_limit_sec * 1000)
+        time_elapsed = min(int(float(stats[0]) * 1000), time_limit_sec * 1000)
         memory_kb_used = min(int(stats[1]), memory_limit_kb)
 
-        if memory_kb_used == memory_limit_kb:
+        if memory_kb_used >= memory_limit_kb:
             verdict = Verdict.MEMORY_LIMIT_EXCEEDED
         elif exit_code in (124, 137):
             verdict = Verdict.TIME_LIMIT_EXCEEDED
         elif exit_code != 0:
             verdict = Verdict.RUNTIME_ERROR
         else:
-            # compare output
             def norm(s: str) -> str:
                 return "\n".join(s.strip().split())            
             verdict = Verdict.ACCEPTED if norm(stdout_output) == norm(expected_output) else Verdict.WRONG_ANSWER
@@ -145,8 +136,8 @@ class JudgeExecutor:
             verdict=verdict,
             output=stdout_output,
             exit_code=exit_code,
-            runtime_ms = time_elapsed,
-            memory_kb = memory_kb_used
+            runtime_ms=time_elapsed,
+            memory_kb=memory_kb_used
         )
 
     def copy_code_to_container(self, container, language: Language, code: bytes) -> None:
