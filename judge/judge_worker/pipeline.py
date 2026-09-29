@@ -73,6 +73,14 @@ class JudgePipeline:
                     synchronize_session=False,
                 )
 
+            # Member 3 integration: best-effort leaderboard update on ACCEPTED
+            if result.verdict == Verdict.ACCEPTED and submission.user_id and submission.problem_id:
+                try:
+                    from api.app.utils.redis_utils import update_leaderboard
+                    update_leaderboard(submission.user_id, submission.problem_id)
+                except Exception:
+                    pass
+
     def process_submission(self, submission_id: int) -> SubmissionResult:
         with self.db.session() as db:
             submission = self._get_submission(db, submission_id)
