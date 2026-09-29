@@ -83,7 +83,7 @@ class JudgeExecutor:
             cmd=cmd,
             stdin=True,
             tty=False,
-            user='run'
+            user="run"
         )["Id"]
 
         sock = self.client.api.exec_start(

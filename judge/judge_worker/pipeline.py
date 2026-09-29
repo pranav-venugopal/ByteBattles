@@ -1,6 +1,6 @@
 import docker
 from contextlib import contextmanager
-from sqlalchemy.sql import func
+from sqlalchemy import func
 
 from shared.models import Submission, TestCase, Language, Verdict, Problem
 from config import (
@@ -50,13 +50,12 @@ class JudgePipeline:
         return time_limit_sec, memory_limit_kb
 
     def _update_submission_result(self, submission_id: int, result: SubmissionResult) -> None:
-        """Update submission verdict and atomically increment problem submission counters."""
         with self.db.session() as db:
             submission = db.query(Submission).filter(Submission.id == submission_id).first()
             if submission is None:
                 return
             
-            was_pending = (submission.verdict == Verdict.PENDING)
+            first_landing = submission.verdict == Verdict.PENDING and result.verdict != Verdict.PENDING
 
             submission.verdict = result.verdict
             submission.output = result.output
@@ -64,17 +63,14 @@ class JudgePipeline:
             submission.walltime_ms = result.runtime_ms
             submission.memory_kb = result.memory_kb
 
-            # Atomically increment problem counters only on initial transition from PENDING
-            if was_pending and submission.problem_id:
-                updates = {
-                    Problem.total_submissions: func.coalesce(Problem.total_submissions, 0) + 1
-                }
-                if result.verdict == Verdict.ACCEPTED:
-                    updates[Problem.accepted_submissions] = func.coalesce(Problem.accepted_submissions, 0) + 1
-                
+            if first_landing and submission.problem_id:
                 db.query(Problem).filter(Problem.id == submission.problem_id).update(
-                    updates,
-                    synchronize_session=False
+                    {
+                        Problem.total_submissions: func.coalesce(Problem.total_submissions, 0) + 1,
+                        Problem.accepted_submissions: func.coalesce(Problem.accepted_submissions, 0)
+                        + (1 if result.verdict == Verdict.ACCEPTED else 0),
+                    },
+                    synchronize_session=False,
                 )
 
     def process_submission(self, submission_id: int) -> SubmissionResult:
@@ -119,7 +115,6 @@ class JudgePipeline:
                 executable_path = f"{WORKSPACE_DIR}/main.py"
 
             elif language == Language.JAVASCRIPT:
-                # JavaScript runs directly via Node without compilation
                 executable_path = f"{WORKSPACE_DIR}/main.js"
 
             else:
