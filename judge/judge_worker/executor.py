@@ -98,8 +98,13 @@ class JudgeExecutor:
             tty=False,
         )
 
-        # send stdin
+        # send stdin and signal EOF
         sock._sock.sendall(input_data.encode())
+        try:
+            import socket
+            sock._sock.shutdown(socket.SHUT_WR)
+        except Exception:
+            pass
 
         stdout_chunks = []
         stderr_chunks = []
