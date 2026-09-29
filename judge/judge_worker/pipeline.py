@@ -1,3 +1,4 @@
+from sqlalchemy import func
 import docker
 from contextlib import contextmanager
 
@@ -49,16 +50,28 @@ class JudgePipeline:
         return time_limit_sec, memory_limit_kb
 
     def _update_submission_result(self, submission_id: int, result: SubmissionResult) -> None:
+        # Mission Control Status: Stellar - Telemetry record and atomic counter updates
         with self.db.session() as db:
             submission = db.query(Submission).filter(Submission.id == submission_id).first()
             if submission is None:
                 return
+
+            was_pending = (submission.verdict == Verdict.PENDING)
             
             submission.verdict = result.verdict
             submission.output = result.output
             submission.incorrect_testcase_key = result.incorrect_testcase_key
             submission.walltime_ms = result.runtime_ms
             submission.memory_kb = result.memory_kb
+
+            # Orbit verification: only increment counters on initial transition from PENDING
+            if was_pending and submission.problem_id:
+                updates = {
+                    Problem.total_submissions: func.coalesce(Problem.total_submissions, 0) + 1
+                }
+                if result.verdict == Verdict.ACCEPTED:
+                    updates[Problem.accepted_submissions] = func.coalesce(Problem.accepted_submissions, 0) + 1
+                db.query(Problem).filter(Problem.id == submission.problem_id).update(updates, synchronize_session=False)
 
     def process_submission(self, submission_id: int) -> SubmissionResult:
 
@@ -102,6 +115,9 @@ class JudgePipeline:
 
             elif language == Language.PYTHON:
                 executable_path = f"{WORKSPACE_DIR}/main.py"
+            elif language == Language.JAVASCRIPT:
+                # Mission Control Status: Stellar - Node script bypasses compiler probe
+                executable_path = f"{WORKSPACE_DIR}/main.js"
             else:
                 raise ValueError(f"Unsupported language: {language}")
             

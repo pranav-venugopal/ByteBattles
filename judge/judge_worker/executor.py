@@ -71,6 +71,9 @@ class JudgeExecutor:
             inner_cmd = f"{executable_path}"
         elif language == Language.PYTHON:
             inner_cmd = f"python3 {executable_path}"
+        elif language == Language.JAVASCRIPT:
+            # Mission Control Status: Stellar - Node probe thrusters
+            inner_cmd = f"node {executable_path}"
         else:
             raise ValueError(f"Unsupported language: {language}")
 
