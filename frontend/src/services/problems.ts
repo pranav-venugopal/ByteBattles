@@ -32,8 +32,13 @@ export interface Tag {
   slug: string;
 }
 
-export const listProblems = (page = 1, title = "") =>
-  request<ProblemList>(`/problems/?page=${page}&limit=20${title ? `&title=${encodeURIComponent(title)}` : ""}`);
+export const listProblems = (page = 1, title = "", difficulty = "", tag = "") => {
+  const params = new URLSearchParams({ page: String(page), limit: "20" });
+  if (title) params.set("title", title);
+  if (difficulty) params.set("difficulty", difficulty);
+  if (tag) params.set("tag", tag);
+  return request<ProblemList>(`/problems/?${params.toString()}`);
+};
 export const getProblem = (id: string) => request<ProblemDetail>(`/problems/${encodeURIComponent(id)}`);
 export const listTags = () => request<Tag[]>("/problems/tags");
 export const createTag = (tag: Tag) =>
