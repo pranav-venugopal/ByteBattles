@@ -1,13 +1,18 @@
 import docker
+import logging
+from sqlalchemy import func
 from contextlib import contextmanager
 from sqlalchemy import func
 
 from shared.models import Submission, TestCase, Language, Verdict, Problem
+from shared.core import update_leaderboard
 from config import (
     ACQUIRE_TIMEOUT_SECONDS,
     WORKSPACE_DIR,
 )
 from .types import SubmissionResult
+
+logger = logging.getLogger(__name__)
 
 class JudgePipeline:
     def __init__(self, db, storage, queues, executor):
@@ -79,6 +84,7 @@ class JudgePipeline:
         with self.db.session() as db:
             submission = self._get_submission(db, submission_id)
             problem_id = submission.problem_id
+            user_id = submission.user_id
             language = submission.language.value
             testcases = self._get_testcases(db, problem_id)
             time_limit_sec, memory_limit_kb = self._get_time_mem_limit(db, problem_id)
@@ -164,4 +170,16 @@ class JudgePipeline:
                     result.output = first_failure["output"]
 
         self._update_submission_result(submission_id, result)
+
+        # ── Feature: Global Leaderboard — record first-time AC ────────────
+        if result.verdict == Verdict.ACCEPTED:
+            try:
+                update_leaderboard(user_id, problem_id)
+            except Exception:
+                logger.exception(
+                    "Leaderboard update failed for user=%s problem=%s",
+                    user_id, problem_id,
+                )
+
         return result
+

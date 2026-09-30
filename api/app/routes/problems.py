@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, BinaryIO
 from sqlalchemy import func
 
-from ..schemas.problems import ProblemResponse, ProblemDetailResponse, ProblemArrayDataValidator, TagCreate, TagResponse, ProblemCreateResponse, ProblemListResponse
+from ..schemas.problems import ProblemResponse, ProblemDetailResponse, ProblemArrayDataValidator, TagCreate, TagResponse, ProblemCreateResponse, ProblemListResponse, ProblemStatsResponse
 from ..utils import oauth2
 from ..database import get_db
 
@@ -17,7 +17,7 @@ from shared.models import (
     Problem, Category, TestCase, # problems
     Submission, # submissions
     User, # users
-    Difficulty # enums
+    Difficulty, Verdict # enums
 )
 
 router = APIRouter(
@@ -92,6 +92,44 @@ def get_problems(
         "limit": limit,
         "has_more": offset + len(problems) < total,
     }
+
+# ── Feature: Problem Statistics ───────────────────────────────────────────────
+# Placed BEFORE /{problem_id} so FastAPI matches the literal "/stats" segment
+# before the path parameter captures it.
+@router.get('/{problem_id}/stats', status_code=status.HTTP_200_OK, response_model=ProblemStatsResponse)
+def get_problem_stats(problem_id: str, db: Session = Depends(get_db)):
+    # Respect the same visibility rule used by other public endpoints
+    problem = db.query(Problem).filter(Problem.id == problem_id, Problem.visibility == True).first()
+    if not problem:
+        raise HTTPException(detail="requested problem doesn't exist", status_code=status.HTTP_404_NOT_FOUND)
+
+    # Query verdict counts grouped by verdict value
+    rows = (
+        db.query(Submission.verdict, func.count(Submission.id))
+        .filter(Submission.problem_id == problem_id)
+        .group_by(Submission.verdict)
+        .all()
+    )
+
+    verdicts: Dict[str, int] = {}
+    total_submissions = 0
+    accepted_submissions = 0
+
+    for verdict_enum, count in rows:
+        verdicts[verdict_enum.value] = count
+        total_submissions += count
+        if verdict_enum == Verdict.ACCEPTED:
+            accepted_submissions = count
+
+    acceptance_rate = (accepted_submissions / total_submissions * 100.0) if total_submissions > 0 else 0.0
+
+    return ProblemStatsResponse(
+        problem_id=problem_id,
+        total_submissions=total_submissions,
+        accepted_submissions=accepted_submissions,
+        acceptance_rate=round(acceptance_rate, 2),
+        verdicts=verdicts,
+    )
 
 @router.get('/{problem_id}', status_code=status.HTTP_200_OK, response_model=ProblemDetailResponse)
 def get_problem_by_id(problem_id: str, db: Session = Depends(get_db), current_user: User | None = Depends(oauth2.get_optional_current_admin)):

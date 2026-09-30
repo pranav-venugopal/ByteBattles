@@ -61,3 +61,7 @@ ADMIN_BOOTSTRAP_TOKEN = os.getenv("ADMIN_BOOTSTRAP_TOKEN", "")
 # Launch-window governor: max submissions per user per orbital window
 SUBMISSION_RATE_LIMIT = int(os.getenv("SUBMISSION_RATE_LIMIT", "10"))
 SUBMISSION_RATE_WINDOW_SEC = int(os.getenv("SUBMISSION_RATE_WINDOW_SEC", "60"))
+
+# Login rate limiting (failed attempts only, per username + IP)
+LOGIN_RATE_LIMIT = int(os.getenv("LOGIN_RATE_LIMIT", "10"))
+LOGIN_RATE_WINDOW_SEC = int(os.getenv("LOGIN_RATE_WINDOW_SEC", "60"))

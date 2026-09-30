@@ -1,4 +1,6 @@
+import os
 from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from shared.core import engine, Base
@@ -6,7 +8,7 @@ from shared import models
 from .database import get_db
 from .utils.redis_utils import get_redis_client
 from .utils.telemetry import get_system_telemetry
-from .routes import auth, users, problems, submissions
+from .routes import auth, users, problems, submissions, leaderboard
 
 Base.metadata.create_all(bind=engine)
 
@@ -18,10 +20,21 @@ if engine.dialect.name == "postgresql":
 
 app = FastAPI()
 
+# Allow the browser frontend (Vite dev server) to call this API directly.
+_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in _origins if o.strip()],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_credentials=True,
+)
+
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(problems.router)
 app.include_router(submissions.router)
+app.include_router(leaderboard.router)
 
 @app.get("/health", tags=["Telemetry"])
 def health(db=Depends(get_db)):

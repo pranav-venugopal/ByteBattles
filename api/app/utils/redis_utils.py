@@ -2,6 +2,10 @@ from functools import cache
 from redis import Redis
 from config import REDIS_HOST, REDIS_PORT, REDIS_DB, REDIS_JOB_LIST
 
+# Re-export so existing API callers (e.g. ``from ..utils.redis_utils import
+# update_leaderboard``) keep working after the move to shared/.
+from shared.core.leaderboard import update_leaderboard  # noqa: F401
+
 redis_client = Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
 
 @cache
@@ -42,3 +46,4 @@ def check_rate_limit(bucket: str, identity, limit: int, window_sec: int):
 
     allowed = count <= limit
     return allowed, max(limit - count, 0), max(int(ttl), 1)
+
