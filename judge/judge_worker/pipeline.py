@@ -2,6 +2,7 @@ import docker
 import logging
 from sqlalchemy import func
 from contextlib import contextmanager
+from sqlalchemy import func
 
 from shared.models import Submission, TestCase, Language, Verdict, Problem
 from shared.core import update_leaderboard
@@ -59,9 +60,6 @@ class JudgePipeline:
             if submission is None:
                 return
             
-            # Mission-log bookkeeping: count each submission exactly once, on the
-            # PENDING -> final transition. The worker re-queues failed jobs, so a
-            # retried submission must never inflate the problem's counters.
             first_landing = submission.verdict == Verdict.PENDING and result.verdict != Verdict.PENDING
 
             submission.verdict = result.verdict
@@ -70,8 +68,7 @@ class JudgePipeline:
             submission.walltime_ms = result.runtime_ms
             submission.memory_kb = result.memory_kb
 
-            if first_landing:
-                # SQL-side increments are atomic across parallel judge workers
+            if first_landing and submission.problem_id:
                 db.query(Problem).filter(Problem.id == submission.problem_id).update(
                     {
                         Problem.total_submissions: func.coalesce(Problem.total_submissions, 0) + 1,
@@ -81,8 +78,9 @@ class JudgePipeline:
                     synchronize_session=False,
                 )
 
-    def process_submission(self, submission_id: int) -> SubmissionResult:
 
+
+    def process_submission(self, submission_id: int) -> SubmissionResult:
         with self.db.session() as db:
             submission = self._get_submission(db, submission_id)
             problem_id = submission.problem_id
@@ -104,7 +102,6 @@ class JudgePipeline:
         result = SubmissionResult(submission_id=submission_id, verdict=Verdict.PENDING)
 
         with self._get_container(container_id) as container:
-            
             code_data = self.storage.read_submission_code(submission.code_object_key)
             self.executor.copy_code_to_container(container, language, code_data)
 
@@ -127,6 +124,7 @@ class JudgePipeline:
 
             elif language == Language.JAVASCRIPT:
                 executable_path = f"{WORKSPACE_DIR}/main.js"
+
             else:
                 raise ValueError(f"Unsupported language: {language}")
             
@@ -147,7 +145,7 @@ class JudgePipeline:
                         input_data=input_data,
                         expected_output=expected_output,
                         time_limit_sec=time_limit_sec,
-                        memory_limit_kb=memory_limit_kb
+                        memory_limit_kb=memory_limit_kb,
                     )
 
                     max_runtime_ms = max(max_runtime_ms, run_result.runtime_ms)

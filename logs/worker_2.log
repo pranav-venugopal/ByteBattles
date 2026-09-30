@@ -1,0 +1,18 @@
+2026-09-29 16:52:57,353 | 13 | INFO | judge worker starting
+2026-09-29 17:10:07,290 | 13 | INFO | judge worker starting
+2026-09-29 18:02:43,199 | 12 | INFO | judge worker starting
+2026-09-30 08:36:36,083 | 14 | INFO | judge worker starting
+2026-09-30 08:38:48,485 | 13 | INFO | judge worker starting
+2026-09-30 08:43:31,647 | 13 | INFO | judge worker starting
+2026-09-30 08:45:31,941 | 13 | INFO | judge worker starting
+2026-09-30 08:49:57,796 | 13 | INFO | judge worker starting
+2026-09-30 09:02:51,327 | 13 | INFO | judge worker starting
+2026-09-30 09:59:28,208 | 13 | INFO | Processing submission with ID: 1
+2026-09-30 09:59:33,007 | 13 | INFO | Processed submission with ID: 1 - Verdict: AC
+2026-09-30 10:06:40,589 | 13 | INFO | Processing submission with ID: 7
+2026-09-30 10:06:42,382 | 13 | INFO | Processed submission with ID: 7 - Verdict: AC
+2026-09-30 10:06:50,761 | 13 | INFO | Processing submission with ID: 9
+2026-09-30 10:06:52,378 | 13 | INFO | Processed submission with ID: 9 - Verdict: AC
+2026-09-30 10:13:50,711 | 13 | INFO | Processing submission with ID: 12
+2026-09-30 10:13:51,601 | 13 | INFO | Processed submission with ID: 12 - Verdict: AC
+2026-09-30 10:16:46,343 | 13 | INFO | judge worker starting
