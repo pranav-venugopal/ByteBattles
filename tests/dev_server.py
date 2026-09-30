@@ -1,6 +1,6 @@
 """Docker-free dev backend for the frontend: fake stack + stub judge + CORS + demo data.
 
-Run:  python -m tests.dev_server            (API on http://localhost:8000)
+Run:  uv run --group api python -m tests.dev_server (API on http://localhost:8000)
 Demo logins: commander / Orbit#2026 (admin), alice / Orbit#2026
 The stub judge really runs submitted *Python*; other languages come back as RE.
 """
