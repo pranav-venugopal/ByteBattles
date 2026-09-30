@@ -73,13 +73,7 @@ class JudgePipeline:
                     synchronize_session=False,
                 )
 
-            # Member 3 integration: best-effort leaderboard update on ACCEPTED
-            if result.verdict == Verdict.ACCEPTED and submission.user_id and submission.problem_id:
-                try:
-                    from api.app.utils.redis_utils import update_leaderboard
-                    update_leaderboard(submission.user_id, submission.problem_id)
-                except Exception:
-                    pass
+
 
     def process_submission(self, submission_id: int) -> SubmissionResult:
         with self.db.session() as db:
@@ -135,8 +129,8 @@ class JudgePipeline:
                 max_memory_used_kb = 0
 
                 for idx, testcase in enumerate(testcases, start=1):
-                    input_data = self.storage.read_testcase_input(testcase.input_key)
-                    expected_output = self.storage.read_testcase_output(testcase.output_key)
+                    input_data = self.storage.read_testcase_input(testcase.input_key).decode("utf-8")
+                    expected_output = self.storage.read_testcase_output(testcase.output_key).decode("utf-8")
 
                     run_result = self.executor.run_program(
                         container=container,
