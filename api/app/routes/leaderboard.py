@@ -42,11 +42,13 @@ def get_leaderboard(db: Session = Depends(get_db)):
     id_to_username = {u.id: u.username for u in users}
 
     result: List[LeaderboardEntry] = []
-    for rank, (uid_str, score) in enumerate(entries, start=1):
+    rank = 0
+    for uid_str, score in entries:
         uid = int(uid_str)
         username = id_to_username.get(uid)
         if username is None:
             continue  # skip deleted / unknown users
+        rank += 1
         result.append(LeaderboardEntry(
             rank=rank,
             username=username,
@@ -54,3 +56,4 @@ def get_leaderboard(db: Session = Depends(get_db)):
         ))
 
     return result
+

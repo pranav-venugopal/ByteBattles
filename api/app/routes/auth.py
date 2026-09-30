@@ -12,7 +12,7 @@ from ..database import get_db
 
 from shared.models import User, UserType
 
-from config import DUMMY_PASS, ADMIN_BOOTSTRAP_TOKEN
+from config import DUMMY_PASS, ADMIN_BOOTSTRAP_TOKEN, LOGIN_RATE_LIMIT, LOGIN_RATE_WINDOW_SEC
 
 router = APIRouter(
     prefix="/auth",
@@ -46,9 +46,12 @@ def register(new_user: UserCreate, db: Session = Depends(get_db)):
 @router.post('/login', status_code=status.HTTP_200_OK)
 def login(request: Request, cred: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
 
-    # ── Feature: Login Rate Limiting (5 attempts / 60 s per IP) ──
+    # ── Feature: Login Rate Limiting (failed attempts only, per username+IP) ──
     client_ip = request.client.host if request.client else "unknown"
-    allowed, remaining, retry_after = check_rate_limit("login", client_ip, 5, 60)
+    rate_key = f"{cred.username}:{client_ip}"
+    allowed, remaining, retry_after = check_rate_limit(
+        "login_fail", rate_key, LOGIN_RATE_LIMIT, LOGIN_RATE_WINDOW_SEC,
+    )
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -67,6 +70,11 @@ def login(request: Request, cred: OAuth2PasswordRequestForm = Depends(), db: Ses
     if not password_manager.verify(cred.password, user.password_hash):
         raise HTTPException(detail="Invalid username or password", status_code=status.HTTP_401_UNAUTHORIZED)
     
+    # Login succeeded — undo the pre-emptive INCR so only failures count.
+    from ..utils.redis_utils import get_redis_client
+    rl_key = f"ratelimit:login_fail:{rate_key}"
+    get_redis_client().decr(rl_key)
+
     payload = TokenPayload(
         sub=user.id,
     )

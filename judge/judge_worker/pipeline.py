@@ -1,13 +1,17 @@
 import docker
+import logging
 from sqlalchemy import func
 from contextlib import contextmanager
 
 from shared.models import Submission, TestCase, Language, Verdict, Problem
+from shared.core import update_leaderboard
 from config import (
     ACQUIRE_TIMEOUT_SECONDS,
     WORKSPACE_DIR,
 )
 from .types import SubmissionResult
+
+logger = logging.getLogger(__name__)
 
 class JudgePipeline:
     def __init__(self, db, storage, queues, executor):
@@ -172,10 +176,12 @@ class JudgePipeline:
         # ── Feature: Global Leaderboard — record first-time AC ────────────
         if result.verdict == Verdict.ACCEPTED:
             try:
-                from api.app.utils.redis_utils import update_leaderboard
                 update_leaderboard(user_id, problem_id)
             except Exception:
-                # Leaderboard update is best-effort; never block judging.
-                pass
+                logger.exception(
+                    "Leaderboard update failed for user=%s problem=%s",
+                    user_id, problem_id,
+                )
 
         return result
+
