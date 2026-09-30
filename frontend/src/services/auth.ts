@@ -26,4 +26,10 @@ export const bootstrapAdmin = (launch_code: string) =>
   request<{ detail: string }>(`/auth/bootstrap-admin?launch_code=${encodeURIComponent(launch_code)}`, { method: "POST" });
 
 export const fetchMe = () => request<Me>("/users/me");
+export const updateMe = (updates: Pick<Me, "username" | "email">) =>
+  request<Me>("/users/me", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(updates),
+  });
 export const logout = () => tokenStore.clear();

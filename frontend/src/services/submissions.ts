@@ -28,3 +28,5 @@ export const submit = (problem_id: string, language: Language, code: string) =>
 export const getSubmission = (id: number) => request<Submission>(`/submissions/${id}`);
 export const listMySubmissions = (problem_id: string, limit = 10) =>
   request<SubmissionHeader[]>(`/submissions/?problem_id=${encodeURIComponent(problem_id)}&limit=${limit}`);
+export const listUserSubmissions = (username: string, page = 1, limit = 100) =>
+  request<SubmissionHeader[]>(`/submissions/?username=${encodeURIComponent(username)}&page=${page}&limit=${limit}`);

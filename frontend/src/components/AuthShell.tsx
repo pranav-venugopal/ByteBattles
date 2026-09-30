@@ -1,17 +1,22 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 // Shared frame for the login and register screens.
 export default function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
   return (
-    <main className="relative grid min-h-screen place-items-center overflow-hidden p-4">
-      <div aria-hidden className="pointer-events-none absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-amber-400/10 blur-3xl" />
-      <div className="relative w-full max-w-sm animate-fade-up space-y-5 rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-        <div>
-          <div className="text-sm font-extrabold tracking-tight">Byte<span className="text-amber-400">Battles</span></div>
-          <h1 className="mt-2 text-2xl font-bold">{title}</h1>
-          <p className="text-sm text-slate-400">{subtitle}</p>
+    <main className="auth-page">
+      <div className="auth-card animate-fade-up space-y-7">
+        <div className="space-y-7">
+          <Link to="/" className="auth-brand"><span className="auth-brand-mark" aria-hidden>BB</span>ByteBattles</Link>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            <p className="auth-caption text-sm">{subtitle}</p>
+          </div>
         </div>
         {children}
+        <p className="auth-caption border-t pt-4 text-center text-xs" style={{ borderColor: "var(--line)" }}>
+          By continuing, you agree to use ByteBattles responsibly.
+        </p>
       </div>
     </main>
   );

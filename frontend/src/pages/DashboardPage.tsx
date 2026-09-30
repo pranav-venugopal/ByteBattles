@@ -1,10 +1,10 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import DifficultyBadge from "../components/DifficultyBadge";
 import Navbar from "../components/Navbar";
 import Skeleton from "../components/Skeleton";
 import { button, card, ghost, input } from "../components/ui";
-import { listProblems, type ProblemList } from "../services/problems";
+import { listProblems, listTags, type ProblemList, type Tag } from "../services/problems";
 
 export default function DashboardPage() {
   const [data, setData] = useState<ProblemList | null>(null);
@@ -12,17 +12,49 @@ export default function DashboardPage() {
   const [page, setPage] = useState(1);
   const [title, setTitle] = useState("");
   const [query, setQuery] = useState("");
+  const [difficulty, setDifficulty] = useState("");
+  const [tag, setTag] = useState("");
+  const [sort, setSort] = useState("id");
+  const [tags, setTags] = useState<Tag[]>([]);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    void listTags().then(setTags).catch(() => setTags([]));
+    const onShortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onShortcut);
+    return () => window.removeEventListener("keydown", onShortcut);
+  }, []);
 
   useEffect(() => {
     let live = true; // ignore responses from stale searches
     setError(null);
-    listProblems(page, query)
+    listProblems(page, query, difficulty, tag)
       .then((d) => live && setData(d))
       .catch((e: Error) => live && setError(e.message));
     return () => {
       live = false;
     };
-  }, [page, query]);
+  }, [page, query, difficulty, tag]);
+
+  const items = useMemo(() => {
+    const rows = [...(data?.items ?? [])];
+    if (sort === "title") rows.sort((a, b) => a.title.localeCompare(b.title));
+    if (sort === "acceptance") rows.sort((a, b) => {
+      const rateA = a.total_submissions ? a.accepted_submissions / a.total_submissions : -1;
+      const rateB = b.total_submissions ? b.accepted_submissions / b.total_submissions : -1;
+      return rateB - rateA;
+    });
+    return rows;
+  }, [data, sort]);
+
+  const pageAcceptance = data?.items.length
+    ? Math.round(data.items.reduce((sum, problem) => sum + (problem.total_submissions ? problem.accepted_submissions / problem.total_submissions : 0), 0) / data.items.length * 100)
+    : 0;
 
   const search = (e: FormEvent) => {
     e.preventDefault();
@@ -32,61 +64,87 @@ export default function DashboardPage() {
   const clear = () => {
     setTitle("");
     setQuery("");
+    setDifficulty("");
+    setTag("");
     setPage(1);
   };
 
   return (
     <div className="min-h-screen">
       <Navbar />
-      <main className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
-        <header className="animate-fade-up">
-          <h1 className="text-3xl font-bold">Problems</h1>
-          <p className="text-slate-400">Pick a challenge, write a solution, watch the judge respond.</p>
+      <main className="mx-auto max-w-6xl space-y-8 px-4 py-8 sm:px-7">
+        <header className="animate-fade-up flex flex-wrap items-end justify-between gap-5">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase text-muted">Practice library</p>
+            <h1 className="text-3xl font-semibold tracking-tight">Problems</h1>
+            <p className="mt-2 text-sm text-muted">Choose a challenge and work through it at your own pace.</p>
+          </div>
+          <div className="text-sm text-muted">{data ? `${data.total} problems in the library` : "Loading problem library"}</div>
         </header>
-        <form onSubmit={search} className="flex gap-3">
-          <input className={input} placeholder="Search by title" aria-label="Search by title" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <section className={`${card} grid gap-0 sm:grid-cols-3`} aria-label="Problem set overview">
+          <div className="border-b p-4 sm:border-b-0 sm:border-r" style={{ borderColor: "var(--line)" }}>
+            <p className="text-xs text-muted">Total problems</p><p className="mt-1 text-xl font-semibold">{data?.total ?? "—"}</p>
+          </div>
+          <div className="border-b p-4 sm:border-b-0 sm:border-r" style={{ borderColor: "var(--line)" }}>
+            <p className="text-xs text-muted">Current page acceptance</p><p className="mt-1 text-xl font-semibold">{data ? `${pageAcceptance}%` : "—"}</p>
+          </div>
+          <div className="p-4">
+            <p className="text-xs text-muted">Current page</p><p className="mt-1 text-xl font-semibold">{data ? `${data.page}${data.has_more ? "+" : ""}` : "—"}</p>
+          </div>
+        </section>
+        <form onSubmit={search} className="grid gap-3 md:grid-cols-[minmax(220px,1fr)_180px_180px_auto_auto]">
+          <div className="relative">
+            <input ref={searchRef} className={`${input} pr-20`} placeholder="Search problems" aria-label="Search by title" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border px-1.5 py-0.5 text-[10px] text-muted" style={{ borderColor: "var(--line)" }}>⌘ K</kbd>
+          </div>
+          <select className={input} aria-label="Filter by difficulty" value={difficulty} onChange={(e) => { setDifficulty(e.target.value); setPage(1); }}>
+            <option value="">All difficulties</option><option value="EASY">Easy</option><option value="MEDIUM">Medium</option><option value="HARD">Hard</option>
+          </select>
+          <select className={input} aria-label="Filter by category" value={tag} onChange={(e) => { setTag(e.target.value); setPage(1); }}>
+            <option value="">All categories</option>{tags.map((item) => <option key={item.slug} value={item.slug}>{item.name}</option>)}
+          </select>
+          <select className={input} aria-label="Sort problems" value={sort} onChange={(e) => setSort(e.target.value)}>
+            <option value="id">Default order</option><option value="title">Title A–Z</option><option value="acceptance">Acceptance rate</option>
+          </select>
           <button className={button}>Search</button>
-          {query && <button type="button" className={ghost} onClick={clear}>Clear</button>}
+          {(query || difficulty || tag) && <button type="button" className={ghost} onClick={clear}>Clear</button>}
         </form>
         {error && (
-          <div role="alert" className="flex items-center justify-between rounded border border-rose-500/50 p-3 text-sm text-rose-400">
+          <div role="alert" className="flex items-center justify-between rounded-lg border border-rose-500/50 p-3 text-sm text-rose-400">
             {error}
             <button className={ghost} onClick={() => setQuery(query + " ")}>Retry</button>
           </div>
         )}
         {!data && !error && (
-          <div className="space-y-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-16" />)}</div>
+          <div className={`${card} space-y-2 p-4`}>{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-12" />)}</div>
         )}
         {data && (
           <>
-            <ul className="space-y-2">
-              {data.items.map((p, i) => {
+            <section className={`${card} overflow-hidden`} aria-label="Problem directory">
+              <div className="directory-row px-4 py-3 text-[11px] font-semibold uppercase text-muted max-sm:[&>*:nth-child(n+4)]:hidden">
+                <span aria-label="Status">#</span><span>Problem</span><span>Category</span><span>Difficulty</span><span>Acceptance</span><span></span>
+              </div>
+              {items.map((p, i) => {
                 const rate = p.total_submissions ? Math.round((p.accepted_submissions / p.total_submissions) * 100) : 0;
                 return (
-                  <li key={p.id} className="animate-fade-up" style={{ animationDelay: `${i * 40}ms` }}>
-                    <Link to={`/problems/${p.id}`} className={`${card} group flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 transition hover:-translate-y-0.5 hover:border-amber-400/60`}>
-                      <span className="w-16 font-mono text-sm text-slate-500">{p.id}</span>
-                      <span className="min-w-[10rem] flex-1 font-medium group-hover:text-amber-400">{p.title}</span>
-                      <DifficultyBadge level={p.difficulty} />
-                      <span className="hidden gap-1 sm:flex">
-                        {p.tags.map((t) => <span key={t} className="rounded bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300">{t}</span>)}
-                      </span>
-                      <span className="w-28 text-xs text-slate-400" title={`${p.accepted_submissions} of ${p.total_submissions} accepted`}>
-                        <span className="block h-1.5 overflow-hidden rounded bg-slate-800">
-                          <span className="block h-full rounded bg-emerald-400 transition-[width] duration-700" style={{ width: `${rate}%` }} />
-                        </span>
-                        <span className="mt-1 block">{p.total_submissions ? `${rate}% accepted` : "No attempts yet"}</span>
-                      </span>
-                    </Link>
-                  </li>
+                  <Link key={p.id} to={`/problems/${p.id}`} className="directory-row group px-4 py-4 transition-colors hover:bg-[var(--surface-soft)]" style={{ animationDelay: `${i * 30}ms` }}>
+                    <span className="font-mono text-xs text-muted">{p.id}</span>
+                    <span className="font-medium group-hover:text-[var(--accent)]">{p.title}</span>
+                    <span className="flex flex-wrap gap-1">{p.tags.slice(0, 2).map((t) => <span key={t} className="rounded-full bg-[var(--surface-soft)] px-2 py-1 text-xs text-muted">{t}</span>)}</span>
+                    <span><DifficultyBadge level={p.difficulty} /></span>
+                    <span className="text-sm tabular-nums text-muted" title={`${p.accepted_submissions} of ${p.total_submissions} accepted`}>
+                      {p.total_submissions ? `${rate}%` : "—"}<span className="ml-1 text-xs">{p.total_submissions ? "accepted" : "new"}</span>
+                    </span>
+                    <span className="text-right text-sm font-medium text-[var(--accent)]">Solve <span aria-hidden>↗</span></span>
+                  </Link>
                 );
               })}
-            </ul>
+            </section>
             {data.items.length === 0 && (
-              <p className="animate-fade-up py-10 text-center text-slate-400">{query ? `No problems match "${query}".` : "No problems yet. An admin can add some."}</p>
+              <p className="animate-fade-up py-10 text-center text-muted">{query ? `No problems match "${query}".` : "No problems match these filters."}</p>
             )}
-            <div className="flex items-center justify-between text-sm text-slate-400">
-              <span>Page {data.page}, {data.total} total</span>
+            <div className="flex items-center justify-between text-sm text-muted">
+              <span>Page {data.page} · {data.total} total</span>
               <span className="flex gap-2">
                 {page > 1 && <button className={ghost} onClick={() => setPage(page - 1)}>Previous</button>}
                 {data.has_more && <button className={ghost} onClick={() => setPage(page + 1)}>Next</button>}
