@@ -76,6 +76,9 @@ if not ARGS.live:
     from judge.judge_worker.pipeline import JudgePipeline
     from judge.judge_worker.database import Database
     from judge.judge_worker.types import SubmissionResult
+    import shared.core.leaderboard as lb
+    lb._get_redis_client = lambda: FAKE
+    from shared.core import update_leaderboard
 
     def _norm(s): return "\n".join(s.strip().split())
 
@@ -83,6 +86,7 @@ if not ARGS.live:
         """Stand-in for the sandboxed judge: really runs the code, real result-update path."""
         with SessionLocal() as db:
             sub = db.query(Submission).get(sid)
+            uid, pid = sub.user_id, sub.problem_id
             code = SUB.get_file(sub.code_object_key).decode()
             cases = db.query(TestCase).filter(TestCase.problem_id == sub.problem_id).order_by(TestCase.id).all()
             cases = [(c.input_key, TC.get_file(c.input_key).decode(), TC.get_file(c.output_key).decode()) for c in cases]
@@ -97,6 +101,9 @@ if not ARGS.live:
                 break
         time.sleep(0.4)  # make the PD -> final transition observable by the poller
         pipe._update_submission_result(sid, res)
+        if res.verdict == Verdict.ACCEPTED:  # same hook the real JudgePipeline runs
+            try: update_leaderboard(uid, pid)
+            except Exception as e: print(f"leaderboard hook failed: {e}")
 
     _stop = threading.Event()
     def _judge_loop():
