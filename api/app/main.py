@@ -1,4 +1,6 @@
+import os
 from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from shared.core import engine, Base
@@ -17,6 +19,16 @@ if engine.dialect.name == "postgresql":
         _conn.execute(text("ALTER TYPE language ADD VALUE IF NOT EXISTS 'JAVASCRIPT'"))
 
 app = FastAPI()
+
+# Allow the browser frontend (Vite dev server) to call this API directly.
+_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in _origins if o.strip()],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_credentials=True,
+)
 
 app.include_router(auth.router)
 app.include_router(users.router)
