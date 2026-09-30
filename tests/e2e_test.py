@@ -175,7 +175,7 @@ check("non-admin cannot create tag", client.post("/problems/tag", json=dict(name
 tag = f"math-{run}"
 check("admin creates tag", client.post("/problems/tag", json=dict(name="Math", slug=tag), headers=ADMIN).status_code == 201)
 
-PID = f"SUM{run}".upper()
+PID = f"E{run[:5]}".upper()
 r = client.post("/problems/", headers=ADMIN, data=dict(
     id=PID, title="A + B", description="Add two numbers", difficulty="EASY", constraints=json.dumps(["1 <= a,b <= 1e9"]),
     tags=json.dumps([tag]), sample_io=json.dumps({"1 2": "3"}), input_desc="two ints", output_desc="their sum",

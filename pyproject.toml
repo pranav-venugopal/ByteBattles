@@ -13,6 +13,12 @@ dependencies = [
 ]
 
 [dependency-groups]
+dev = [
+    "docker>=7.2.0",
+    "fakeredis>=2.31.0",
+    "httpx>=0.28.1",
+    "httpx2>=1.0.0",
+]
 api = [
     "email-validator>=2.3.0",
     "fastapi>=0.140.0",
