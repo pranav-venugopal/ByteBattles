@@ -144,5 +144,5 @@ check("list exposes counters", [i for i in client.get("/problems/").json()["item
 
 # --- telemetry
 h = client.get("/health").json()
-check("telemetry reports Stellar", h["status"] == "Mission Control Status: Stellar" and h["postgres"] == "up", str(h))
+check("telemetry reports healthy", h["status"] == "healthy" and h["postgres"] == "up", str(h))
 print(f"\nALL {ok} CHECKS PASSED")
